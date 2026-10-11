@@ -4,7 +4,6 @@
 
 import { useEffect, useRef } from "react";
 import { Outlet, useParams } from "react-router";
-import AgentSidebar from "~/components/AgentSidebar";
 import ComposeEmail from "~/components/ComposeEmail";
 import Header from "~/components/Header";
 import Sidebar from "~/components/Sidebar";
@@ -16,13 +15,8 @@ export default function MailboxRoute() {
 	// Prefetch mailbox data for child components
 	useMailbox(mailboxId);
 	const prevMailboxIdRef = useRef<string | undefined>(undefined);
-	const {
-		isSidebarOpen,
-		closeSidebar,
-		isAgentPanelOpen,
-		closePanel,
-		closeComposeModal,
-	} = useUIStore();
+	const { isSidebarOpen, closeSidebar, closePanel, closeComposeModal } =
+		useUIStore();
 
 	useEffect(() => {
 		if (
@@ -68,13 +62,6 @@ export default function MailboxRoute() {
 					<Outlet />
 				</main>
 			</div>
-
-			{/* Agent + MCP sidebar -- togglable on desktop */}
-			{isAgentPanelOpen && (
-				<div className="hidden lg:flex w-[380px] shrink-0 border-l border-kumo-line flex-col bg-kumo-base overflow-hidden">
-					<AgentSidebar />
-				</div>
-			)}
 
 			<ComposeEmail />
 		</div>

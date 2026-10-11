@@ -29,22 +29,11 @@
 			"preview_bucket_name": "duty"
 		}
 	],
-	"ai": {
-		"binding": "AI"
-	},
 	"durable_objects": {
 		"bindings": [
 			{
 				"name": "MAILBOX",
 				"class_name": "MailboxDO"
-			},
-			{
-				"name": "EMAIL_AGENT",
-				"class_name": "EmailAgent"
-			},
-			{
-				"name": "EMAIL_MCP",
-				"class_name": "EmailMCP"
 			}
 		]
 	},
@@ -64,6 +53,13 @@
 		{
 			"tag": "v3",
 			"new_sqlite_classes": [
+				"EmailMCP"
+			]
+		},
+		{
+			"tag": "v4",
+			"deleted_classes": [
+				"EmailAgent",
 				"EmailMCP"
 			]
 		}

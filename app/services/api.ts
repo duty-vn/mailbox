@@ -109,6 +109,8 @@ const api = {
 		put<Mailbox>(`/api/v1/mailboxes/${mailboxId}`, { settings }),
 	deleteMailbox: (mailboxId: string) =>
 		del<void>(`/api/v1/mailboxes/${mailboxId}`),
+	testTelegram: (mailboxId: string, botToken: string, chatId: string) =>
+		post<{ status: string }>(`/api/v1/mailboxes/${mailboxId}/telegram/test`, { botToken, chatId }),
 
 	// Emails
 	listEmails: (mailboxId: string, params: Record<string, string>, opts?: { signal?: AbortSignal }) =>

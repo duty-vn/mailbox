@@ -8,12 +8,18 @@ export interface SignatureSettings {
 	html?: string;
 }
 
+export interface TelegramSettings {
+	enabled: boolean;
+	botToken: string;
+	chatId: string;
+}
+
 export interface MailboxSettings {
 	fromName?: string;
 	forwarding?: { enabled: boolean; email: string };
 	signature?: SignatureSettings;
 	autoReply?: { enabled: boolean; subject: string; message: string };
-	agentSystemPrompt?: string;
+	telegram?: TelegramSettings;
 }
 
 export interface Mailbox {

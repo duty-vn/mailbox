@@ -20,6 +20,12 @@ import { handleReplyEmail, handleForwardEmail } from "./routes/reply-forward";
 import { Folders } from "../shared/folders";
 import type { Env } from "./types";
 import { requireMailbox, type MailboxContext } from "./lib/mailbox";
+import {
+	sendTelegramMessage,
+	formatNewEmailNotification,
+	getActiveTelegramSettings,
+	TelegramError,
+} from "./lib/telegram";
 
 type AppContext = Context<MailboxContext>;
 
@@ -28,7 +34,7 @@ type AppContext = Context<MailboxContext>;
 const CreateMailboxBody = z.object({
 	email: z.string().email(),
 	name: z.string().min(1),
-	settings: z.record(z.any()).optional(), // unvalidated — agentSystemPrompt goes straight to AI
+	settings: z.record(z.any()).optional(),
 });
 
 const DraftBody = z.object({
@@ -40,6 +46,11 @@ const DraftBody = z.object({
 	in_reply_to: z.string().optional(),
 	thread_id: z.string().optional(),
 	draft_id: z.string().optional(),
+});
+
+const TelegramTestBody = z.object({
+	botToken: z.string().trim().min(1),
+	chatId: z.string().trim().min(1),
 });
 
 // -- Helpers --------------------------------------------------------
@@ -294,6 +305,22 @@ app.delete("/api/v1/mailboxes/:mailboxId/folders/:id", async (c: AppContext) => 
 	return ok ? c.body(null, 204) : c.json({ error: "Folder not found or cannot be deleted" }, 400);
 });
 
+// -- Notifications --------------------------------------------------
+
+app.post("/api/v1/mailboxes/:mailboxId/telegram/test", async (c: AppContext) => {
+	const mailboxId = c.req.param("mailboxId")!;
+	const parsed = TelegramTestBody.safeParse(await c.req.json());
+	if (!parsed.success) return c.json({ error: "Bot token and chat ID are required" }, 400);
+	try {
+		await sendTelegramMessage(parsed.data.botToken, parsed.data.chatId,
+			formatNewEmailNotification(mailboxId, "Test notification"));
+	} catch (e) {
+		if (e instanceof TelegramError) return c.json({ error: e.message }, 400);
+		throw e;
+	}
+	return c.json({ status: "sent" });
+});
+
 // -- Search ---------------------------------------------------------
 
 app.get("/api/v1/mailboxes/:mailboxId/search", async (c: AppContext) => {
@@ -364,7 +391,9 @@ async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env
 	if (!mailboxId) throw new Error("received email with no valid recipient address");
 
 	const messageId = crypto.randomUUID();
-	if (!(await env.BUCKET.head(`mailboxes/${mailboxId}.json`))) { console.log(`Ignoring email for ${mailboxId}: mailbox does not exist`); return; }
+	const mailboxObj = await env.BUCKET.get(`mailboxes/${mailboxId}.json`);
+	if (!mailboxObj) { console.log(`Ignoring email for ${mailboxId}: mailbox does not exist`); return; }
+	const mailboxSettings = await mailboxObj.json<Record<string, any>>().catch(() => null);
 
 	const stub = env.MAILBOX.get(env.MAILBOX.idFromName(mailboxId));
 
@@ -402,11 +431,12 @@ async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env
 		thread_id: threadId, message_id: originalMessageId, raw_headers: JSON.stringify(parsedEmail.headers),
 	}, attachmentData);
 
-	const agentStub = env.EMAIL_AGENT.get(env.EMAIL_AGENT.idFromName(mailboxId));
-	ctx.waitUntil(agentStub.fetch(new Request("https://agents/onNewEmail", {
-		method: "POST", headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ mailboxId, emailId: messageId, sender: (parsedEmail.from?.address || "").toLowerCase(), subject: parsedEmail.subject || "", threadId }),
-	})).catch((e) => console.error("Auto-draft trigger failed:", (e as Error).message)));
+	const telegram = getActiveTelegramSettings(mailboxSettings);
+	if (telegram) {
+		ctx.waitUntil(sendTelegramMessage(telegram.botToken, telegram.chatId,
+			formatNewEmailNotification(mailboxId, parsedEmail.subject || ""),
+		).catch((e) => console.error("Telegram notification failed:", (e as Error).message)));
+	}
 }
 
 export { app, receiveEmail };
